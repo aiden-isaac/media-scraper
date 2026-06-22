@@ -4,6 +4,11 @@ description: "Task list for Topic Research Scraper"
 
 # Tasks: Topic Research Scraper
 
+> **Status (2026-06-22)**: T001–T024 and T026 complete and committed (`f01c33f`); stub test
+> passes, CLI/config verified. **Open**: T025 (end-to-end quickstart run) and T027 (manual
+> gated-login check) — both require your live LLM endpoint + a desktop browser, so run them
+> on your machine per `quickstart.md`.
+
 **Input**: Design documents from `/specs/001-topic-research-scraper/`
 
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/
