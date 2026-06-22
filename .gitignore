@@ -1,0 +1,22 @@
+# Secrets — never commit
+.env
+*.env
+secrets.toml
+
+# Persisted browser sessions (manual logins)
+.browser-profile/
+user-data/
+
+# Generated reports
+reports/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# OS / editor
+.DS_Store
