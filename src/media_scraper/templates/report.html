@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Media Scraper - Report{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="report-header">
+        <h2>{{ topic }}</h2>
+        <a href="/reports" class="btn btn-secondary">&larr; Back to Reports</a>
+    </div>
+    <div class="report-content">{{ content | safe }}</div>
+</div>
+{% endblock %}

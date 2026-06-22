@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Media Scraper - Settings{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>Configuration</h2>
+    <form id="config-form">
+        <div class="form-group">
+            <label for="base_url">LLM Endpoint URL</label>
+            <input type="url" id="base_url" name="base_url" placeholder="https://api.openai.com/v1">
+        </div>
+        <div class="form-group">
+            <label for="model">Model Name</label>
+            <input type="text" id="model" name="model" placeholder="gpt-4o">
+        </div>
+        <div class="form-group">
+            <label for="output_dir">Output Directory</label>
+            <input type="text" id="output_dir" name="output_dir" placeholder="/home/user/media-scraper/reports">
+        </div>
+        <div class="form-group">
+            <label for="max_sources">Max Sources</label>
+            <input type="number" id="max_sources" name="max_sources" min="1" max="100">
+        </div>
+        <div class="form-group">
+            <label for="max_chars_per_source">Max Chars Per Source</label>
+            <input type="number" id="max_chars_per_source" name="max_chars_per_source" min="100" max="50000">
+        </div>
+        <div class="form-group checkbox-group">
+            <input type="checkbox" id="headless" name="headless">
+            <label for="headless">Run browser in headless mode</label>
+        </div>
+        <div class="form-group info-box">
+            <strong>API Key:</strong> <span id="api-key-status"></span>
+            <p class="info-text">The API key is read from environment variable only and cannot be changed here.</p>
+        </div>
+        <button type="submit" class="btn btn-primary">Save Configuration</button>
+    </form>
+    <div id="save-message" class="status-message" style="display: none;"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadConfig() {
+    try {
+        const response = await fetch('/api/config');
+        if (!response.ok) return;
+        
+        const config = await response.json();
+        document.getElementById('base_url').value = config.base_url || '';
+        document.getElementById('model').value = config.model || '';
+        document.getElementById('output_dir').value = config.output_dir || '';
+        document.getElementById('max_sources').value = config.max_sources || 12;
+        document.getElementById('max_chars_per_source').value = config.max_chars_per_source || 8000;
+        document.getElementById('headless').checked = config.headless || false;
+        
+        const apiKeyStatus = document.getElementById('api-key-status');
+        apiKeyStatus.textContent = config.api_key_set ? '✓ Configured' : '✕ Not set';
+        apiKeyStatus.className = config.api_key_set ? 'success' : 'error';
+    } catch (err) {
+        console.error('Failed to load config:', err);
+    }
+}
+
+document.getElementById('config-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const config = {
+        base_url: document.getElementById('base_url').value.trim(),
+        model: document.getElementById('model').value.trim(),
+        output_dir: document.getElementById('output_dir').value.trim(),
+        headless: document.getElementById('headless').checked,
+        max_sources: parseInt(document.getElementById('max_sources').value),
+        max_chars_per_source: parseInt(document.getElementById('max_chars_per_source').value),
+    };
+
+    const saveMsg = document.getElementById('save-message');
+    saveMsg.style.display = 'block';
+    saveMsg.className = 'status-message loading';
+    saveMsg.textContent = 'Saving...';
+
+    try {
+        const response = await fetch('/api/config', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(config)
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.detail || 'Failed to save configuration');
+        }
+
+        saveMsg.className = 'status-message success';
+        saveMsg.textContent = '✓ Configuration saved successfully!';
+        setTimeout(() => { saveMsg.style.display = 'none'; }, 3000);
+    } catch (err) {
+        saveMsg.className = 'status-message error';
+        saveMsg.textContent = '✕ Error: ' + err.message;
+        setTimeout(() => { saveMsg.style.display = 'none'; }, 5000);
+    }
+});
+
+loadConfig();
+</script>
+{% endblock %}

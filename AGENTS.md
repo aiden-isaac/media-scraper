@@ -34,3 +34,8 @@ No network or browser required for the test suite — it uses a `StubLLM` and fa
 - Failed sources are not dropped — they appear in the appendix.
 - The stub-LLM test (`tests/test_pipeline.py`) is the canonical verification that these invariants hold. Run it after any pipeline change.
 - No lint/typecheck/formatter config exists — keep code style consistent with existing files.
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->

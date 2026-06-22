@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}Media Scraper - Home{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>New Research</h2>
+    <form id="topic-form" onsubmit="startResearch(event)">
+        <label for="topic">Research Topic</label>
+        <textarea 
+            id="topic" 
+            name="topic" 
+            rows="4" 
+            placeholder="Enter your research topic here... (e.g., 'impact of AI on journalism')"
+            required
+            minlength="1"
+            maxlength="5000"
+        ></textarea>
+        <div class="char-count"><span id="char-count">0</span>/5000</div>
+        <button type="submit" id="submit-btn" class="btn btn-primary">Start Research</button>
+    </form>
+</div>
+
+<div id="progress-section" class="card" style="display: none;">
+    <h2>Research Progress</h2>
+    <div class="phase-indicator">
+        <div class="phase" data-phase="planning">
+            <span class="phase-dot"></span>
+            <span class="phase-label">Planning</span>
+        </div>
+        <div class="phase-connector"></div>
+        <div class="phase" data-phase="gathering">
+            <span class="phase-dot"></span>
+            <span class="phase-label">Gathering</span>
+        </div>
+        <div class="phase-connector"></div>
+        <div class="phase" data-phase="analyzing">
+            <span class="phase-dot"></span>
+            <span class="phase-label">Analyzing</span>
+        </div>
+        <div class="phase-connector"></div>
+        <div class="phase" data-phase="synthesizing">
+            <span class="phase-dot"></span>
+            <span class="phase-label">Synthesizing</span>
+        </div>
+        <div class="phase-connector"></div>
+        <div class="phase" data-phase="complete">
+            <span class="phase-dot"></span>
+            <span class="phase-label">Complete</span>
+        </div>
+    </div>
+    <div id="status-message" class="status-message"></div>
+    <div id="result-area" class="result-area" style="display: none;"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let pollInterval = null;
+const charInput = document.getElementById('topic');
+const charCount = document.getElementById('char-count');
+
+charInput.addEventListener('input', () => {
+    charCount.textContent = charInput.value.length;
+});
+
+async function startResearch(e) {
+    e.preventDefault();
+    const topic = charInput.value.trim();
+    if (!topic) return;
+
+    const submitBtn = document.getElementById('submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Starting...';
+
+    try {
+        const response = await fetch('/api/run/start', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({topic: topic})
+        });
+
+        if (response.status === 409) {
+            alert('A scraper run is already in progress.');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Start Research';
+            return;
+        }
+
+        if (!response.ok) {
+            const data = await response.json();
+            alert(data.detail || 'Failed to start research.');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Start Research';
+            return;
+        }
+
+        showProgress();
+        pollStatus();
+        pollInterval = setInterval(pollStatus, 2000);
+    } catch (err) {
+        alert('Network error: ' + err.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Start Research';
+    }
+}
+
+function showProgress() {
+    document.getElementById('progress-section').style.display = 'block';
+}
+
+async function pollStatus() {
+    try {
+        const response = await fetch('/api/run/status');
+        if (!response.ok) return;
+        
+        const status = await response.json();
+        updatePhaseIndicator(status.phase, status.status);
+        
+        const statusMsg = document.getElementById('status-message');
+        statusMsg.textContent = `Topic: "${status.topic}" — ${formatStatus(status.status)}${status.phase !== 'idle' && status.phase !== 'complete' ? ' (' + status.phase + ')' : ''}`;
+
+        if (status.status === 'success') {
+            clearInterval(pollInterval);
+            showResult(status.report_path, status.topic);
+        } else if (status.status === 'error' || status.status === 'cancelled') {
+            clearInterval(pollInterval);
+            showError(status.error_message || 'Research failed.');
+        }
+    } catch (err) {
+        console.error('Poll error:', err);
+    }
+}
+
+function formatStatus(status) {
+    const map = {
+        'idle': 'Ready',
+        'running': 'Running',
+        'success': 'Complete!',
+        'error': 'Error',
+        'cancelled': 'Cancelled'
+    };
+    return map[status] || status;
+}
+
+function updatePhaseIndicator(phase, status) {
+    const phases = ['planning', 'gathering', 'analyzing', 'synthesizing', 'complete'];
+    const currentIdx = phases.indexOf(phase);
+    
+    document.querySelectorAll('.phase').forEach((el, idx) => {
+        el.classList.remove('active', 'completed', 'current');
+        if (idx < currentIdx || status === 'success') {
+            el.classList.add('completed');
+        } else if (idx === currentIdx) {
+            el.classList.add('current');
+        }
+    });
+}
+
+function showResult(reportPath, topic) {
+    const resultArea = document.getElementById('result-area');
+    resultArea.style.display = 'block';
+    resultArea.innerHTML = `
+        <div class="success-box">
+            <h3>✓ Research Complete!</h3>
+            <p>Report generated successfully.</p>
+            <a href="/report/${encodeURIComponent(reportPath.split('/').pop())}" class="btn btn-success" target="_blank">View Report</a>
+            <a href="/reports" class="btn btn-secondary">All Reports</a>
+        </div>
+    `;
+    document.getElementById('submit-btn').disabled = false;
+    document.getElementById('submit-btn').textContent = 'Start Research';
+}
+
+function showError(message) {
+    const resultArea = document.getElementById('result-area');
+    resultArea.style.display = 'block';
+    resultArea.innerHTML = `
+        <div class="error-box">
+            <h3>✕ Research Failed</h3>
+            <p>${message}</p>
+            <a href="/" class="btn btn-secondary">Try Again</a>
+        </div>
+    `;
+    document.getElementById('submit-btn').disabled = false;
+    document.getElementById('submit-btn').textContent = 'Start Research';
+}
+</script>
+{% endblock %}

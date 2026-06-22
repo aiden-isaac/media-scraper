@@ -18,5 +18,13 @@ dependencies = [
 [project.scripts]
 media-scraper = "media_scraper.cli:main"
 
+[project.optional-dependencies]
+gui = [
+    "fastapi>=0.104",
+    "uvicorn[standard]>=0.24",
+    "python-multipart>=0.0.6",
+    "markdown>=3.5",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]

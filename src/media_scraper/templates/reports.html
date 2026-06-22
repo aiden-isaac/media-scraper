@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Media Scraper - Reports{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>Past Reports</h2>
+    {% if reports %}
+    <table class="reports-table">
+        <thead>
+            <tr>
+                <th>Topic</th>
+                <th>Date</th>
+                <th>Sources</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for report in reports %}
+            <tr>
+                <td>{{ report.topic }}</td>
+                <td>{{ report.created_at }}</td>
+                <td>{{ report.source_count or '-' }}</td>
+                <td>
+                    <a href="/report/{{ report.filename | urlencode }}" class="btn btn-small" target="_blank">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p>No reports yet.</p>
+        <p>Run a research topic from the <a href="/">Home page</a> to generate your first report.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

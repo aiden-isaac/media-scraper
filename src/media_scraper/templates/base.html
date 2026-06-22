@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Media Scraper{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href="/" class="nav-brand">Media Scraper</a>
+            <ul class="nav-links">
+                <li><a href="/" {% if request.path == '/' %}class="active"{% endif %}>Home</a></li>
+                <li><a href="/config" {% if request.path == '/config' %}class="active"{% endif %}>Settings</a></li>
+                <li><a href="/reports" {% if request.path.startswith('/report') or request.path == '/reports' %}class="active"{% endif %}>Reports</a></li>
+            </ul>
+        </div>
+    </nav>
+    <main class="container">
+        {% if flash_message %}
+        <div class="flash {{ flash_type }}">{{ flash_message }}</div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+    <footer class="footer">
+        <p>media-scraper v{{ version }} &mdash; localhost only</p>
+    </footer>
+</body>
+</html>
