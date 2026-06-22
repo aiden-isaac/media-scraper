@@ -12,6 +12,9 @@ See `specs/001-topic-research-scraper/` for the full spec, plan, and design.
 
 ```bash
 pip install -e .
+# Or, to include the web GUI:
+pip install -e ".[gui]"
+
 playwright install chromium    # one-time browser download
 ```
 
@@ -27,7 +30,7 @@ Edit `config.toml` (endpoint, model, output dir, caps) or run the interactive ed
 python -m media_scraper --configure
 ```
 
-## Run
+## Run CLI
 
 ```bash
 python -m media_scraper                       # prompts for a topic
@@ -38,6 +41,15 @@ python -m media_scraper --topic "<topic>" --headless   # open sources only, no m
 Watch the streaming log (`plan → gather → analyze → synthesize`). When a site needs login or
 shows a captcha, the browser window pauses — sign in / solve it, then press Enter. The login
 is reused next time. On completion the report path is printed (under `output_dir`).
+
+## Run Web GUI
+
+If you installed the `[gui]` optional dependencies, you can run a local web server to manage settings, launch research tasks, and view reports from your browser:
+
+```bash
+python -m media_scraper gui --port 8000
+```
+Then open `http://localhost:8000` in your web browser.
 
 ## Test
 
