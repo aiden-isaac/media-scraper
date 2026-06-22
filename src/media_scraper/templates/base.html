@@ -11,9 +11,9 @@
         <div class="nav-inner">
             <a href="/" class="nav-brand">Media Scraper</a>
             <ul class="nav-links">
-                <li><a href="/" {% if request.path == '/' %}class="active"{% endif %}>Home</a></li>
-                <li><a href="/config" {% if request.path == '/config' %}class="active"{% endif %}>Settings</a></li>
-                <li><a href="/reports" {% if request.path.startswith('/report') or request.path == '/reports' %}class="active"{% endif %}>Reports</a></li>
+                <li><a href="/" {% if current_path == '/' %}class="active"{% endif %}>Home</a></li>
+                <li><a href="/config" {% if current_path == '/config' %}class="active"{% endif %}>Settings</a></li>
+                <li><a href="/reports" {% if current_path.startswith('/report') or current_path == '/reports' %}class="active"{% endif %}>Reports</a></li>
             </ul>
         </div>
     </nav>

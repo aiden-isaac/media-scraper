@@ -54,8 +54,16 @@ def temp_config(tmp_path):
         "max_chars_per_source": 8000,
     }
     config_file = tmp_path / "config.toml"
-    with open(config_file, "wb") as f:
-        f.write(tomllib.dumps(config_data).encode())
+    lines = []
+    for k, v in config_data.items():
+        if isinstance(v, bool):
+            rendered = "true" if v else "false"
+        elif isinstance(v, (int, float)):
+            rendered = str(v)
+        else:
+            rendered = '"' + str(v).replace("\\", "\\\\").replace('"', '\\"') + '"'
+        lines.append(f"{k} = {rendered}")
+    config_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return config_file
 
 
