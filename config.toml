@@ -1,0 +1,10 @@
+# media-scraper configuration. NO SECRETS HERE.
+# The LLM API key is read from the env var MEDIA_SCRAPER_API_KEY.
+
+base_url = "https://llm.frizzt.com/v1"
+model = "qwen-moe-coder"
+output_dir = "reports"
+user_data_dir = ".browser-profile"
+headless = false
+max_sources = 12
+max_chars_per_source = 8000
