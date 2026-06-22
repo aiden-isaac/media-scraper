@@ -21,7 +21,8 @@ from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, field_validator
+from jinja2 import Environment, FileSystemLoader
+from pydantic import BaseModel, ConfigDict, StrictBool, StrictInt, field_validator
 
 from .config import load_config, save_config
 from .llm import LLM
@@ -219,12 +220,14 @@ class StartRequest(BaseModel):
 
 
 class ConfigUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    
     base_url: Optional[str] = None
     model: Optional[str] = None
     output_dir: Optional[str] = None
-    headless: Optional[bool] = None
-    max_sources: Optional[int] = None
-    max_chars_per_source: Optional[int] = None
+    headless: Optional[StrictBool] = None
+    max_sources: Optional[StrictInt] = None
+    max_chars_per_source: Optional[StrictInt] = None
 
 
 # ---------------------------------------------------------------------------
@@ -233,8 +236,21 @@ class ConfigUpdateRequest(BaseModel):
 
 VERSION = "0.1.0"
 
-app = FastAPI(title="Media Scraper GUI", version=VERSION)
-templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    yield
+    # Shutdown
+    if run_state.is_running:
+        run_state.status = "cancelled"
+        run_state._cancel_event.set()
+        logger.info("Background scraper cancelled on shutdown")
+
+app = FastAPI(title="Media Scraper GUI", version=VERSION, lifespan=lifespan)
+_j2_env = Environment(loader=FileSystemLoader(str(Path(__file__).parent / "templates")), cache_size=0)
+templates = Jinja2Templates(env=_j2_env)
 app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
 
 
@@ -244,19 +260,19 @@ app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "version": VERSION})
+    return templates.TemplateResponse(request=request, name="index.html", context={"current_path": "/", "version": VERSION})
 
 
 @app.get("/config", response_class=HTMLResponse)
 async def config_page(request: Request):
-    return templates.TemplateResponse("config.html", {"request": request, "version": VERSION})
+    return templates.TemplateResponse(request=request, name="config.html", context={"current_path": "/config", "version": VERSION})
 
 
 @app.get("/reports", response_class=HTMLResponse)
 async def reports_page(request: Request):
     gui_cfg = _load_gui_config()
     reports = _list_reports(gui_cfg["output_dir"])
-    return templates.TemplateResponse("reports.html", {"request": request, "reports": reports, "version": VERSION})
+    return templates.TemplateResponse(request=request, name="reports.html", context={"current_path": "/reports", "reports": reports, "version": VERSION})
 
 
 @app.get("/report/{filename}", response_class=HTMLResponse)
@@ -275,8 +291,9 @@ async def view_report(request: Request, filename: str):
         topic = safe_name.rsplit("-", 1)[0].replace("-", " ")
         
         return templates.TemplateResponse(
-            "report.html",
-            {"request": request, "content": html_content, "topic": topic, "version": VERSION},
+            request=request,
+            name="report.html",
+            context={"content": html_content, "topic": topic, "version": VERSION},
         )
     except ValueError:
         raise HTTPException(status_code=404, detail="Invalid filename")
@@ -310,7 +327,25 @@ async def start_run(req: StartRequest):
     run_state.completed_at = None
     run_state._cancel_event.clear()
 
-    t = threading.Thread(target=_run_scraper_background, args=(req.topic,), daemon=True)
+    cfg = ScraperConfig(
+        base_url="",
+        model="",
+        api_key="",
+        output_dir=Path(""),
+        user_data_dir=Path(""),
+        headless=False,
+        max_sources=1,
+        max_chars_per_source=1
+    ) # A dummy config just to get it started, we will load real one
+    try:
+        from .config import load_config
+        cfg = load_config(CONFIG_PATH)
+    except Exception as e:
+        logger.error(f"Error loading config: {e}")
+        # we will just proceed with the dummy cfg if there's no config file yet, wait
+        # The GUI endpoints actually read the real config. 
+        
+    t = threading.Thread(target=_run_scraper_background, args=(req.topic, cfg), daemon=True)
     t.start()
 
     return JSONResponse(
@@ -345,7 +380,8 @@ async def update_config(req: ConfigUpdateRequest):
     if "api_key" in raw_data:
         raise HTTPException(status_code=403, detail="Cannot change API key through the GUI.")
 
-    return _save_gui_config(raw_data)
+    config = _save_gui_config(raw_data)
+    return {"message": "Configuration updated.", "config": config}
 
 
 @app.get("/api/reports")
@@ -372,14 +408,4 @@ async def get_report_content(filename: str):
         raise HTTPException(status_code=404, detail="Invalid filename")
 
 
-# ---------------------------------------------------------------------------
-# Graceful shutdown
-# ---------------------------------------------------------------------------
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Clean up on server shutdown."""
-    if run_state.is_running:
-        run_state.status = "cancelled"
-        run_state._cancel_event.set()
-        logger.info("Background scraper cancelled on shutdown")
+# Shutdown logic is now handled in the lifespan context manager.

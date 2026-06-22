@@ -8,50 +8,22 @@ import pytest
 class TestScraperIntegration:
     """End-to-end tests that wire the scraper pipeline through the GUI."""
 
-    def _mock_pipeline(self, stub_llm):
-        """Mock the entire pipeline.run to use our stub LLM."""
-        from media_scraper.models import ResearchPlan, SourceAnalysis
-
-        def mock_run(topic, cfg, llm, gather, log=None):
-            plan = ResearchPlan(
-                topic=topic,
-                sub_questions=[f"What is {topic}?"],
-                search_queries=[topic],
-                rss_feeds=[],
-                target_sites=[],
-            )
-            # Create a single successful source
-            from media_scraper.models import Source
-            sources_list = [Source(url="http://example.com", title="Example", text="Test content", status="ok")]
-            analyzed = [(s, SourceAnalysis(url=s.url, claims=["test"], sentiment="neutral", credibility=3, credibility_rationale="test")) for s in sources_list]
-            
-            body = "## Summary\n\nNo findings."
-            
-            # We need to mock write_report to return a path
-            with patch("media_scraper.report.write_report") as mock_write:
-                import tempfile
-                import os
-                tmpdir = cfg.output_dir if hasattr(cfg, 'output_dir') else None
-                if not tmpdir:
-                    import tempfile
-                    tmpdir = tempfile.mkdtemp()
-                report_path = f"{tmpdir}/{topic.replace(' ', '-').lower()}-20260622-120000.md"
-                mock_write.return_value = type('Path', (), {'__str__': lambda self: report_path})()
-                
-                llm.plan(topic)
-                llm.analyze(sources_list[0])
-                llm.synthesize(topic, plan, analyzed)
-                return mock_write.return_value
-
-        return mock_run
-
     @pytest.fixture
     def patched_client(self, client, stub_llm, temp_config, monkeypatch):
         """Client with pipeline mocked to use stub LLM."""
-        with patch("media_scraper.gui.LLM") as mock_llm_class:
-            mock_llm_class.return_value = stub_llm
-            with patch("media_scraper.pipeline.run") as mock_pipeline:
-                yield mock_pipeline, stub_llm
+        from media_scraper.models import Source
+        
+        mock_browser = MagicMock()
+        mock_gather = MagicMock(return_value=[
+            Source(url="http://example.com", title="Example", text="Test content", status="ok")
+        ])
+        mock_write = MagicMock(return_value="/tmp/test_report.md")
+        
+        with patch("media_scraper.gui.LLM", return_value=stub_llm), \
+             patch("media_scraper.browser.Browser", return_value=mock_browser), \
+             patch("media_scraper.pipeline.gather_sources", mock_gather), \
+             patch("media_scraper.report.write_report", mock_write):
+            yield None, stub_llm
 
     def test_full_pipeline_success(self, client, patched_client):
         """Test a successful scraper run end-to-end through the API."""
@@ -81,9 +53,13 @@ class TestScraperIntegration:
 
         client.post("/api/run/start", json={"topic": "verify stub calls"})
         
-        # Give the background thread time to start
+        # Give the background thread time to start and run
         import time
-        time.sleep(0.2)
+        from media_scraper.gui import run_state
+        for _ in range(10):
+            time.sleep(0.1)
+            if run_state.status in ("success", "error"):
+                break
 
         # At minimum, plan should have been called
         assert stub_llm.plan.called

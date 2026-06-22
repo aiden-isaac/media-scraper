@@ -4,7 +4,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import pytest
 
+@pytest.fixture(autouse=True)
+def mock_background_thread(monkeypatch):
+    """Prevent endpoint tests from actually running the scraper."""
+    monkeypatch.setattr("media_scraper.gui._run_scraper_background", MagicMock())
 class TestGetConfig:
     """Test GET /api/config endpoint."""
 
@@ -50,8 +55,8 @@ class TestUpdateConfig:
 
     def test_rejects_api_key_in_request(self, client):
         resp = client.put("/api/config", json={"api_key": "sk-secret"})
-        assert resp.status_code == 403
-        assert "Cannot change API key" in resp.json()["detail"]
+        assert resp.status_code == 422
+        assert "api_key" in str(resp.json()["detail"])
 
     def test_partial_update_keeps_other_fields(self, client):
         # Change only model, verify other fields preserved
