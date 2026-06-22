@@ -6,5 +6,11 @@ model = "qwen-moe-coder"
 output_dir = "reports"
 user_data_dir = ".browser-profile"
 headless = false
-max_sources = 12
+max_sources = 30
 max_chars_per_source = 8000
+
+# Competitive-intelligence brief (feature 003). brand enables --brief mode.
+brand = "Pos Malaysia"
+competitors = ["J&T Express", "GDEX", "DHL", "FedEx", "City-Link Express"]
+platforms = ["x", "reddit", "youtube", "facebook", "linkedin", "news"]
+recency_days = 7

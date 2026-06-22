@@ -27,8 +27,8 @@ implementation and testing. All paths are under the existing
 
 **Purpose**: Wiring with no logic; safe to do first.
 
-- [ ] T001 [P] Add `.state/` to `.gitignore`
-- [ ] T002 [P] Add brief keys (`brand`, `competitors`, `platforms`, `recency_days`, `max_sources`) for the Pos Malaysia brief to `config.toml`
+- [X] T001 [P] Add `.state/` to `.gitignore`
+- [X] T002 [P] Add brief keys (`brand`, `competitors`, `platforms`, `recency_days`, `max_sources`) for the Pos Malaysia brief to `config.toml`
 
 ---
 
@@ -38,9 +38,9 @@ implementation and testing. All paths are under the existing
 
 **⚠️ CRITICAL**: No user story work begins until this phase is complete.
 
-- [ ] T003 Extend `Config` dataclass with `brand: str`, `competitors: list[str]`, `platforms: list[str]`, `recency_days: int` in `src/media_scraper/models.py`
-- [ ] T004 Extend `SourceAnalysis` dataclass with `subject: str = ""` in `src/media_scraper/models.py`
-- [ ] T005 Update `DEFAULTS` and `load_config` to read the new fields (TOML arrays → lists, ints), keep secret env-only, and validate (`recency_days >= 0`, `max_sources >= 1`) in `src/media_scraper/config.py`
+- [X] T003 Extend `Config` dataclass with `brand: str`, `competitors: list[str]`, `platforms: list[str]`, `recency_days: int` in `src/media_scraper/models.py`
+- [X] T004 Extend `SourceAnalysis` dataclass with `subject: str = ""` in `src/media_scraper/models.py`
+- [X] T005 Update `DEFAULTS` and `load_config` to read the new fields (TOML arrays → lists, ints), keep secret env-only, and validate (`recency_days >= 0`, `max_sources >= 1`) in `src/media_scraper/config.py`
 
 **Checkpoint**: Models/config carry the brief; stories can begin.
 
@@ -56,10 +56,10 @@ web/news sources alone (before social).
 Competitive Sentiment table covers all named brands and each source is
 attributed to a brand.
 
-- [ ] T006 [P] [US1] Add `subject` to the `analyze()` JSON prompt and normalize the returned value against `[brand] + competitors` (case-insensitive; unknown → `"other"`) in `src/media_scraper/llm.py`
-- [ ] T007 [US1] Inject brand + competitors (+ recency hint) into the `plan()` prompt so generated queries are comparative in `src/media_scraper/llm.py`
-- [ ] T008 [US1] Aggregate analyzed sources by `subject` and render a **Competitive Sentiment** section (per-brand positive/neutral/negative counts, avg credibility, mention count; zero-rows for brands with no mentions) plus a "new since last run" note in `src/media_scraper/report.py`
-- [ ] T009 [US1] Extend `tests/test_pipeline.py` with a self-check that the stub-LLM subjects are tallied per brand and the Competitive Sentiment table renders for all brands
+- [X] T006 [P] [US1] Add `subject` to the `analyze()` JSON prompt and normalize the returned value against `[brand] + competitors` (case-insensitive; unknown → `"other"`) in `src/media_scraper/llm.py`
+- [X] T007 [US1] Inject brand + competitors (+ recency hint) into the `plan()` prompt so generated queries are comparative in `src/media_scraper/llm.py`
+- [X] T008 [US1] Aggregate analyzed sources by `subject` and render a **Competitive Sentiment** section (per-brand positive/neutral/negative counts, avg credibility, mention count; zero-rows for brands with no mentions) plus a "new since last run" note in `src/media_scraper/report.py`
+- [X] T009 [US1] Extend `tests/test_pipeline.py` with a self-check that the stub-LLM subjects are tallied per brand and the Competitive Sentiment table renders for all brands
 
 **Checkpoint**: US1 delivers the competitive report independently.
 
@@ -74,11 +74,11 @@ walled sites. Fix the malformed-handle bug.
 **Independent Test**: Configure social platforms, run, confirm
 platform-originated posts/links appear among gathered sources.
 
-- [ ] T010 [P] [US2] Add the per-platform search-URL map and helpers (`search_url(platform, query)`, `site_query(platform, terms)`) in `src/media_scraper/sources.py`
-- [ ] T011 [US2] Add `Browser.search_site(platform, query, limit)` — navigate the search URL, extract result links/snippets as `Source`s, DOM search-box fill + submit as fallback — in `src/media_scraper/browser.py`
-- [ ] T012 [US2] Fix bare-`@handle`/bare-domain normalization so it never yields `https://@handle` in `src/media_scraper/pipeline.py`
-- [ ] T013 [US2] Expand `gather_sources` to run in-site search per platform × brand/competitor, falling back to keyless `site:` `web_search` when blocked/headless, recording results as `kind="social"` in `src/media_scraper/pipeline.py`
-- [ ] T014 [US2] Confirm walled-but-unresolved social sources remain `login_skipped` in the appendix via the new path (extend the stub-LLM check in `tests/test_pipeline.py` if a gather branch is now non-trivial)
+- [X] T010 [P] [US2] Add the per-platform search-URL map and helpers (`search_url(platform, query)`, `site_query(platform, terms)`) in `src/media_scraper/sources.py`
+- [X] T011 [US2] Add `Browser.search_site(platform, query, limit)` — navigate the search URL, extract result links/snippets as `Source`s, DOM search-box fill + submit as fallback — in `src/media_scraper/browser.py`
+- [X] T012 [US2] Fix bare-`@handle`/bare-domain normalization so it never yields `https://@handle` in `src/media_scraper/pipeline.py`
+- [X] T013 [US2] Expand `gather_sources` to run in-site search per platform × brand/competitor, falling back to keyless `site:` `web_search` when blocked/headless, recording results as `kind="social"` in `src/media_scraper/pipeline.py`
+- [X] T014 [US2] Confirm walled-but-unresolved social sources remain `login_skipped` in the appendix via the new path (extend the stub-LLM check in `tests/test_pipeline.py` if a gather branch is now non-trivial)
 
 **Checkpoint**: US1 + US2 work; reports now include social sentiment.
 
@@ -93,11 +93,11 @@ platform-originated posts/links appear among gathered sources.
 sources contain only new items; an unattended run produces a timestamped report
 with no prompts.
 
-- [ ] T015 [P] [US3] Create `src/media_scraper/state.py` with `load_seen(slug)` / `save_seen(slug, urls)` over `.state/<slug>.json` (stdlib `json`; `ponytail:` flat-set ceiling note)
-- [ ] T016 [US3] Add a `timelimit` parameter to `web_search()` and map `recency_days` → `d`/`w`/`m`/`y`; append `sort=new`/`f=live` to social search URLs where supported in `src/media_scraper/sources.py`
-- [ ] T017 [US3] Apply recency to gathering + planner, skip already-seen URLs during gather, and write seen-state only after a report is successfully written; add the `ponytail:` no-recursive-crawl note in `src/media_scraper/pipeline.py`
-- [ ] T018 [US3] Add CLI flags `--max-sources`, `--days`/`--since` (mutually exclusive), and `--brief` (builds the run from config; requires `brand`, else exit 1) and wire overrides in `src/media_scraper/cli.py`
-- [ ] T019 [US3] Extend `tests/test_pipeline.py` with a dedup self-check (a URL present in seen-state is skipped on the next run)
+- [X] T015 [P] [US3] Create `src/media_scraper/state.py` with `load_seen(slug)` / `save_seen(slug, urls)` over `.state/<slug>.json` (stdlib `json`; `ponytail:` flat-set ceiling note)
+- [X] T016 [US3] Add a `timelimit` parameter to `web_search()` and map `recency_days` → `d`/`w`/`m`/`y`; append `sort=new`/`f=live` to social search URLs where supported in `src/media_scraper/sources.py`
+- [X] T017 [US3] Apply recency to gathering + planner, skip already-seen URLs during gather, and write seen-state only after a report is successfully written; add the `ponytail:` no-recursive-crawl note in `src/media_scraper/pipeline.py`
+- [X] T018 [US3] Add CLI flags `--max-sources`, `--days`/`--since` (mutually exclusive), and `--brief` (builds the run from config; requires `brand`, else exit 1) and wire overrides in `src/media_scraper/cli.py`
+- [X] T019 [US3] Extend `tests/test_pipeline.py` with a dedup self-check (a URL present in seen-state is skipped on the next run)
 
 **Checkpoint**: All three stories independently functional; cron-ready.
 
@@ -105,9 +105,9 @@ with no prompts.
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T020 [P] Document `--brief`, `--days`/`--since`, `--max-sources`, the cron line, and the one-time-headed-login note in `AGENTS.md`
-- [ ] T021 Run `python -m pytest tests/test_pipeline.py` and execute the quickstart validations (SC-001 … SC-006) from `specs/003-competitive-intel/quickstart.md`
-- [ ] T022 Constitution re-check: confirm `pyproject.toml` gained no new runtime dependency and the diff stays minimal
+- [X] T020 [P] Document `--brief`, `--days`/`--since`, `--max-sources`, the cron line, and the one-time-headed-login note in `AGENTS.md`
+- [X] T021 Run `python -m pytest tests/test_pipeline.py` and execute the quickstart validations (SC-001 … SC-006) from `specs/003-competitive-intel/quickstart.md`
+- [X] T022 Constitution re-check: confirm `pyproject.toml` gained no new runtime dependency and the diff stays minimal
 
 ---
 

@@ -47,6 +47,88 @@ class Browser:
             if self._pw is not None:
                 self._pw.stop()
 
+    def search_site(self, platform: str, query: str, limit: int = 5, fresh: bool = False) -> list[Source]:
+        """Tier 1+2 in-site search: navigate the platform's search URL, extract result
+        links/snippets as social Sources; DOM search-box fill+submit as fallback.
+
+        Returns [] when the platform is walled and the session can't resolve it — the caller
+        then falls back to keyless `site:` web search.
+        ponytail: result extraction is an anchor-href heuristic, not per-platform parsers;
+        add a parser only if a platform's links stop coming through.
+        """
+        from . import sources
+
+        page = self._page
+        try:
+            page.goto(sources.search_url(platform, query, fresh=fresh), wait_until="domcontentloaded", timeout=30000)
+        except Exception as exc:
+            self.log("gather", f"search_site {platform} failed: {str(exc)[:120]}")
+            return []
+
+        if self._looks_blocked(page):
+            if self.pause is not None and not self.cfg.headless:
+                self.pause(f"Sign in to {platform} in the browser window to search it.")
+                try:
+                    page.reload(wait_until="domcontentloaded", timeout=30000)
+                except Exception:
+                    pass
+            if self._looks_blocked(page):
+                return []  # walled & unresolved — caller uses the site: fallback
+
+        results = self._extract_result_links(page, platform, limit)
+        if not results and self._dom_search(page, query):
+            results = self._extract_result_links(page, platform, limit)
+        return results
+
+    def _extract_result_links(self, page, platform: str, limit: int) -> list[Source]:
+        from . import sources
+
+        domain = sources.SITE_DOMAINS.get(platform, platform)
+        try:
+            anchors = page.eval_on_selector_all(
+                "a[href]", "els => els.map(e => [e.href, (e.innerText||'').trim()])"
+            )
+        except Exception:
+            return []
+        out: list[Source] = []
+        seen: set[str] = set()
+        chrome = ("/search", "/login", "/signup", "/help", "/about", "/policies", "/settings")
+        for href, text in anchors:
+            low = (href or "").lower()
+            if not href or domain not in low or href in seen or any(x in low for x in chrome):
+                continue
+            seen.add(href)
+            out.append(
+                Source(
+                    url=href,
+                    title=(text or href)[:120],
+                    kind="social",
+                    text=(text or "")[: self.cfg.max_chars_per_source],
+                    status="ok",
+                )
+            )
+            if len(out) >= limit:
+                break
+        return out
+
+    def _dom_search(self, page, query: str) -> bool:
+        for sel in (
+            "input[type=search]",
+            "input[name=q]",
+            "input[aria-label*=Search i]",
+            "input[placeholder*=Search i]",
+        ):
+            try:
+                box = page.query_selector(sel)
+                if box:
+                    box.fill(query)
+                    box.press("Enter")
+                    page.wait_for_load_state("domcontentloaded", timeout=15000)
+                    return True
+            except Exception:
+                continue
+        return False
+
     def fetch_page(self, url: str, kind: str = "web", title: str = "") -> Source:
         page = self._page
         try:

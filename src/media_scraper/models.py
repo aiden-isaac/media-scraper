@@ -7,6 +7,7 @@ from pathlib import Path
 SENTIMENTS = ("positive", "neutral", "negative", "mixed")
 SOURCE_KINDS = ("web", "news", "rss", "social")
 SOURCE_STATUSES = ("ok", "login_skipped", "fetch_error")
+PLATFORMS = ("x", "reddit", "youtube", "facebook", "linkedin", "tiktok", "news")
 
 
 @dataclass
@@ -19,6 +20,16 @@ class Config:
     headless: bool = False
     max_sources: int = 12
     max_chars_per_source: int = 8000
+    # Competitive-intelligence brief (feature 003); empty brand = ad-hoc --topic run.
+    brand: str = ""
+    competitors: list[str] = field(default_factory=list)
+    platforms: list[str] = field(default_factory=list)
+    recency_days: int = 0  # 0 = no date filter
+
+    @property
+    def brands(self) -> list[str]:
+        """Full competitive set: primary brand first, then competitors."""
+        return [self.brand, *self.competitors] if self.brand else []
 
 
 @dataclass
@@ -51,3 +62,4 @@ class SourceAnalysis:
     sentiment: str = "neutral"  # one of SENTIMENTS
     credibility: int = 3        # 1..5
     credibility_rationale: str = ""
+    subject: str = ""           # which brand the source concerns; "" / "other" when none

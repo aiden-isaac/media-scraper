@@ -21,6 +21,11 @@ def _parse_args(argv):
     p.add_argument("--base-url", help="Override LLM endpoint for this run.")
     p.add_argument("--headless", action="store_true", help="Run the browser headless (no manual login).")
     p.add_argument("--configure", action="store_true", help="Edit config.toml interactively and exit.")
+    p.add_argument("--max-sources", type=int, help="Override the max sources gathered this run (reach knob).")
+    p.add_argument("--brief", action="store_true", help="Non-interactive run built from config (requires brand). For cron.")
+    recency = p.add_mutually_exclusive_group()
+    recency.add_argument("--days", type=int, help="Recency window: gather only items from the last N days.")
+    recency.add_argument("--since", help="Recency window start date (YYYY-MM-DD); converted to a day count.")
     return p.parse_args(argv)
 
 
@@ -40,6 +45,11 @@ def _configure(path: str) -> None:
         "headless": Prompt.ask("Headless browser? (true/false)", default=str(current.headless).lower()) == "true",
         "max_sources": int(Prompt.ask("Max sources per run", default=str(current.max_sources))),
         "max_chars_per_source": int(Prompt.ask("Max chars per source", default=str(current.max_chars_per_source))),
+        "brand": Prompt.ask("Brand for competitive briefs (blank for none)", default=current.brand),
+        "recency_days": int(Prompt.ask("Recency window in days (0 = no filter)", default=str(current.recency_days))),
+        # Lists are carried through as-is — edit them directly in config.toml.
+        "competitors": current.competitors,
+        "platforms": current.platforms,
     }
     config_mod.save_config(path, data)
     console.print(f"[green]Saved[/] {path}")
@@ -52,6 +62,15 @@ def main(argv=None) -> int:
         _configure(args.config)
         return 0
 
+    recency_days = args.days
+    if args.since:
+        from datetime import date
+        try:
+            recency_days = max(0, (date.today() - date.fromisoformat(args.since)).days)
+        except ValueError:
+            console.print(f"[red]Invalid --since date (expected YYYY-MM-DD):[/] {args.since}")
+            return 1
+
     try:
         cfg = config_mod.load_config(
             args.config,
@@ -60,6 +79,8 @@ def main(argv=None) -> int:
                 "model": args.model,
                 "base_url": args.base_url,
                 "headless": True if args.headless else None,
+                "max_sources": args.max_sources,
+                "recency_days": recency_days,
             },
         )
         config_mod.validate_for_run(cfg)
@@ -70,12 +91,23 @@ def main(argv=None) -> int:
         console.print(f"[red]Config error:[/] {exc}")
         return 1
 
+    if args.brief and not cfg.brand:
+        console.print("[red]--brief requires 'brand' to be set in config.toml.[/]")
+        return 1
+
     config_mod.ensure_dirs(cfg)
 
-    topic = args.topic or Prompt.ask("Research topic")
-    if not topic.strip():
-        console.print("[red]No topic provided.[/]")
-        return 1
+    if args.brief:
+        topic = (
+            f"{cfg.brand} vs {', '.join(cfg.competitors)}: brand perception and competitive intelligence"
+            if cfg.competitors
+            else f"{cfg.brand}: brand perception"
+        )
+    else:
+        topic = args.topic or Prompt.ask("Research topic")
+        if not topic.strip():
+            console.print("[red]No topic provided.[/]")
+            return 1
 
     def log(phase: str, msg: str = "") -> None:
         console.print(f"[bold cyan]{phase:>10}[/] {msg}")
@@ -95,8 +127,9 @@ def main(argv=None) -> int:
                 topic,
                 cfg,
                 llm,
-                gather=lambda plan: pipeline.gather_sources(plan, cfg, browser, log),
+                gather=lambda plan, seen: pipeline.gather_sources(plan, cfg, browser, log, seen=seen),
                 log=log,
+                brand=cfg.brand if args.brief else "",
             )
     except pipeline.NoSourcesError as exc:
         console.print(f"[red]{exc}[/]")

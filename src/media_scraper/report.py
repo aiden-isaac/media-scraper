@@ -12,6 +12,27 @@ def _slug(topic: str) -> str:
     return s[:50].strip("-") or "report"
 
 
+def _competitive_section(cfg: Config, analyzed: list[tuple[Source, SourceAnalysis]]) -> list[str]:
+    """Per-brand sentiment tally over the full competitive set (zero-rows included, SC-001)."""
+    by_subject: dict[str, list[SourceAnalysis]] = {}
+    for _s, a in analyzed:
+        by_subject.setdefault(a.subject, []).append(a)
+
+    out = ["## Competitive Sentiment\n"]
+    out.append("_Reports only mentions new since the last run for this brief._\n")
+    out.append("| Brand | Positive | Neutral | Negative | Mentions | Avg Credibility |")
+    out.append("|---|---|---|---|---|---|")
+    for brand in cfg.brands:
+        items = by_subject.get(brand, [])
+        pos = sum(1 for a in items if a.sentiment == "positive")
+        neg = sum(1 for a in items if a.sentiment == "negative")
+        neu = len(items) - pos - neg  # neutral + mixed under the headline neutral column
+        avg = f"{sum(a.credibility for a in items) / len(items):.1f}" if items else "—"
+        out.append(f"| {brand} | {pos} | {neu} | {neg} | {len(items)} | {avg} |")
+    out.append("")
+    return out
+
+
 def write_report(
     topic: str,
     plan: ResearchPlan,
@@ -35,6 +56,9 @@ def write_report(
 
     out.append("## Summary & Key Findings\n")
     out.append((body or "_No synthesis was produced._").strip() + "\n")
+
+    if cfg.brand:
+        out.extend(_competitive_section(cfg, analyzed))
 
     out.append("## Per-Source Analysis\n")
     if analyzed:

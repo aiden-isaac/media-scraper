@@ -10,6 +10,9 @@ user-data/
 # Generated reports
 reports/
 
+# Per-brief seen-URL state (cross-run dedup)
+.state/
+
 # Python
 __pycache__/
 *.py[cod]

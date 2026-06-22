@@ -17,6 +17,17 @@ class LLMError(Exception):
     """Backend unreachable or returned unusable output (CLI exit code 2)."""
 
 
+def _normalize_subject(value: str, brands: list[str]) -> str:
+    """Map the model's free-text subject to one of `brands` (case-insensitive) or "other"."""
+    if not brands:
+        return ""
+    v = value.strip().lower()
+    for b in brands:
+        if v == b.lower():
+            return b
+    return "other"
+
+
 def _extract_json(text: str) -> dict | None:
     if not text:
         return None
@@ -85,7 +96,17 @@ class LLM:
             '"rss_feeds" (string[] of feed URLs, may be empty), and "target_sites" '
             "(string[] of specific sites/social handles worth checking, may be empty)."
         )
-        data = self._chat_json(system, f"Topic:\n{topic}")
+        user = f"Topic:\n{topic}"
+        if self.cfg.brand:
+            user += (
+                f"\n\nThis is a competitive brand-perception brief. Primary brand: "
+                f"{self.cfg.brand}. Competitors: {', '.join(self.cfg.competitors) or 'none'}. "
+                "Make search_queries comparative — cover the brand AND each competitor "
+                "(reputation, complaints, service, news)."
+            )
+        if self.cfg.recency_days:
+            user += f"\nFocus on the last {self.cfg.recency_days} days only."
+        data = self._chat_json(system, user)
         return ResearchPlan(
             topic=topic,
             sub_questions=[str(x) for x in (data.get("sub_questions") or [])],
@@ -95,11 +116,19 @@ class LLM:
         )
 
     def analyze(self, source: Source) -> SourceAnalysis:
+        brands = self.cfg.brands
+        subject_hint = (
+            f' "subject" (which of these brands the source primarily concerns — one of '
+            f"{brands + ['other']}; use \"other\" if none), and"
+            if brands
+            else ""
+        )
         system = (
             "You are a source analyst. Given a source, return JSON with keys: "
             '"claims" (string[] of key claims), "sentiment" (one of '
             '"positive","neutral","negative","mixed"), "credibility" (integer 1-5, '
-            '5 = highly credible), and "credibility_rationale" (one or two sentences).'
+            f"5 = highly credible),{subject_hint} "
+            '"credibility_rationale" (one or two sentences).'
         )
         user = f"URL: {source.url}\nTitle: {source.title}\n\nContent:\n{source.text}"
         try:
@@ -111,6 +140,7 @@ class LLM:
                 sentiment="neutral",
                 credibility=3,
                 credibility_rationale="Analysis unavailable (model returned unusable output).",
+                subject=_normalize_subject("", brands),
             )
 
         sentiment = str(data.get("sentiment", "neutral")).lower()
@@ -127,6 +157,7 @@ class LLM:
             sentiment=sentiment,
             credibility=cred,
             credibility_rationale=str(data.get("credibility_rationale", "")),
+            subject=_normalize_subject(str(data.get("subject", "")), brands),
         )
 
     def synthesize(self, topic: str, plan: ResearchPlan, analyzed: list[tuple[Source, SourceAnalysis]]) -> str:

@@ -4,7 +4,7 @@ import os
 import tomllib
 from pathlib import Path
 
-from .models import Config
+from .models import PLATFORMS, Config
 
 ENV_KEY = "MEDIA_SCRAPER_API_KEY"
 
@@ -16,6 +16,10 @@ DEFAULTS: dict = {
     "headless": False,
     "max_sources": 12,
     "max_chars_per_source": 8000,
+    "brand": "",
+    "competitors": [],
+    "platforms": [],
+    "recency_days": 0,
 }
 
 
@@ -32,6 +36,16 @@ def load_config(path: str = "config.toml", overrides: dict | None = None) -> Con
     if overrides:
         data.update({k: v for k, v in overrides.items() if v is not None})
 
+    max_sources = int(data["max_sources"])
+    recency_days = int(data["recency_days"])
+    if recency_days < 0:
+        raise ConfigError("recency_days must be >= 0.")
+    if max_sources < 1:
+        raise ConfigError("max_sources must be >= 1.")
+
+    # Unknown platforms are dropped (ponytail: no logger here; typos surface as missing coverage).
+    platforms = [p for p in (str(x).lower() for x in data["platforms"]) if p in PLATFORMS]
+
     return Config(
         base_url=str(data["base_url"]),
         model=str(data["model"]),
@@ -39,8 +53,12 @@ def load_config(path: str = "config.toml", overrides: dict | None = None) -> Con
         output_dir=Path(data["output_dir"]),
         user_data_dir=Path(data["user_data_dir"]),
         headless=bool(data["headless"]),
-        max_sources=int(data["max_sources"]),
+        max_sources=max_sources,
         max_chars_per_source=int(data["max_chars_per_source"]),
+        brand=str(data["brand"]),
+        competitors=[str(x) for x in data["competitors"]],
+        platforms=platforms,
+        recency_days=recency_days,
     )
 
 
@@ -62,13 +80,18 @@ def ensure_dirs(cfg: Config) -> None:
 
 def save_config(path: str, data: dict) -> None:
     """Write a minimal TOML file (tomllib is read-only). Never write secrets here."""
+    def _str(v) -> str:
+        return '"' + str(v).replace("\\", "\\\\").replace('"', '\\"') + '"'
+
     lines = ["# media-scraper configuration. NO SECRETS HERE."]
     for key, value in data.items():
         if isinstance(value, bool):
             rendered = "true" if value else "false"
         elif isinstance(value, (int, float)):
             rendered = str(value)
+        elif isinstance(value, (list, tuple)):
+            rendered = "[" + ", ".join(_str(v) for v in value) + "]"
         else:
-            rendered = '"' + str(value).replace("\\", "\\\\").replace('"', '\\"') + '"'
+            rendered = _str(value)
         lines.append(f"{key} = {rendered}")
     Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
